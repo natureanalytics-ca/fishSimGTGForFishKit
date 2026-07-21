@@ -558,6 +558,112 @@ gtgYPRWrapper<-function(LifeHistoryObj, LcStep = 1, F_MStep = 0.2, waitName=NULL
 }
 
 
+#----------------------
+#YPR fishSimGTG wrapper - for asynchronous processing
+#----------------------
+
+#Roxygen header
+#'YPR eumetric simulation using growth-type group model (asynchronous processing)
+#'
+#'Produces YPR, Yield, and SPR arrays across combinations of F_M and Lc
+#'
+#'Utilizes the growth-type group model to calculate YPR, Yield, and SPR across factorial combination of F_M and Lc.
+#'This produces an array of values for each output, which is useful for surface plot, finding MSY, etc.
+#'Yield is presented in relative terms, with a maximum of 1. YPR is not presented in relative terms, but the user
+#'may want to re-calculate this quantity as relative YPR for presentation purposes.
+#'Required parameters of the LifeHistory object are: Linf, L50, L95delta, M, K, Steep, LW_A, LW_B
+#' @param LifeHistoryObj  A life history object.
+#' @param LcStep Length step size in cm for sequence of length at vulnerability. Approx. knife edge vul. SL50 = Lc, SL95 = Lc + 1
+#' @param F_MStep F/M ratio step size for sequence of F_M
+#' @param asyncProgress When used within a shiny app, this function can update a icp::AsyncProgress
+#' @param gtg The number of growth-type groups. Default is 13.
+#' @param stepsPerYear The number of steps per year. Default is 12.
+#' @param selType When selectivity specified type stated here.
+#' @param selParams Parameters for selectivity function
+#' @param inchStep Optional parameter adding Lc corresponding to inch-based increments
+#' @importFrom methods new
+#' @importFrom stats quantile
+#' @export
+
+gtgYPRWrapper_async <- function (LifeHistoryObj, LcStep = 1, F_MStep = 0.2, asyncProgress = NULL, gtg = 13, stepsPerYear = 12, selType = NULL, selParams = NULL, inchStep = NULL) {
+  if (!is.numeric(LcStep) || !is.numeric(F_MStep) || LcStep < 0 || F_MStep < 0 || !is(LifeHistoryObj, "LifeHistory")) {
+    return(new("YPRarray", sim = list(stop = TRUE)))
+  } else {
+    if (length(LifeHistoryObj@Steep) == 0) LifeHistoryObj@Steep <- 0.99
+    if (LifeHistoryObj@Steep < 0.2) LifeHistoryObj@Steep <- 0.99
+    if (LifeHistoryObj@Steep > 1) LifeHistoryObj@Steep <- 0.99
+    if (length(LifeHistoryObj@LW_A) == 0) LifeHistoryObj@LW_A <- 1e-04
+    if (length(LifeHistoryObj@LW_B) == 0) LifeHistoryObj@LW_B <- 3
+    if (length(LifeHistoryObj@R0) == 0) LifeHistoryObj@R0 <- 10000
+    FisheryObj <- new("Fishery")
+    FisheryObj@retMax <- 1
+    FisheryObj@Dmort <- 0
+    if (is.null(selType)) {
+      FisheryObj@vulType <- "logistic"
+      FisheryObj@vulParams <- c(0, 1)
+    } else {
+      FisheryObj@vulType <- selType
+      FisheryObj@vulParams <- selParams
+    }
+    FisheryObj@retType <- "logistic"
+    TimeAreaObj <- new("TimeArea")
+    TimeAreaObj@gtg <- gtg
+    lh <- LHwrapper(LifeHistoryObj, TimeAreaObj, stepsPerYear)
+    if (is.null(lh)) {
+      return(new("YPRarray", sim = list(stop = TRUE)))
+    } else {
+      mt <- matrix(unlist(lh$L), ncol = NROW(lh$L), byrow = FALSE)
+      Lhigh_likely <- sapply(1:NROW(mt), function(x) { quantile(mt[x, ], probs = 0.75) })
+      Lmax <- max(Lhigh_likely)
+      Lmin <- LifeHistoryObj@L50/2
+      Lc <- seq(floor(Lmin), floor(Lmax), LcStep)
+      if (!is.null(inchStep)) {
+        LcInch <- seq(round(floor(Lmin)/2.54, 0), round(floor(Lmax)/2.54, 0), inchStep) * 2.54
+        Lc <- sort(unique(c(Lc, LcInch)))
+      }
+      F_M <- round(seq(0, floor(max(4, 3/LifeHistoryObj@M)), F_MStep), 3)
+      SPR_EU <- matrix(NA, nrow = NROW(F_M), ncol = NROW(Lc))
+      YPR_EU <- matrix(NA, nrow = NROW(F_M), ncol = NROW(Lc))
+      Yield_EU <- matrix(NA, nrow = NROW(F_M), ncol = NROW(Lc))
+      show_condition <- function(code) { tryCatch({ code }, error = function(c) NULL) }
+      steps <- NROW(Lc) * NROW(F_M)
+      steps_break <- floor(c(0.1, 0.3, 0.5, 0.7, 0.9)*steps)
+      counter <- 0
+      stop = FALSE
+
+      sel_list <- lapply(1:NROW(Lc), function(j) {
+        f_obj <- FisheryObj
+        f_obj@retParams <- c(Lc[j], 1)
+        selWrapper(lh, TimeAreaObj, f_obj, doPlot = FALSE)
+      })
+
+      m_constant <- lh$LifeHistory@M
+
+      for (j in 1:NROW(Lc)) {
+        sel <- sel_list[[j]]
+        for (i in 1:NROW(F_M)) {
+          Feq <- F_M[i] * m_constant
+          tmpSim <- show_condition(solveD(lh = lh, sel = sel, doFit = FALSE, F_in = Feq))
+          if (is.null(tmpSim)) {
+            stop = TRUE
+            break
+          }
+          SPR_EU[i, j] <- tmpSim$SPR
+          YPR_EU[i, j] <- tmpSim$YPR
+          Yield_EU[i, j] <- tmpSim$catchB
+          counter <- counter + 1
+          if (!is.null(asyncProgress) && any(counter == steps_break)) {
+            asyncProgress$set(value = (counter/steps * 100))
+          }
+        }
+        if (stop) break
+      }
+      Yield_EU <- Yield_EU/max(Yield_EU, na.rm = TRUE)
+      return(new("YPRarray", lhWrap = lh, sim = list(Lc = Lc, F_M = F_M, SPR_EU = SPR_EU, YPR_EU = YPR_EU, Yield_EU = Yield_EU, LcStep = LcStep, F_MStep = F_MStep, stop = stop)))
+    }
+  }
+}
+
 #------------------------------------
 #YPR fishSimGTG wrapper for F only
 #------------------------------------

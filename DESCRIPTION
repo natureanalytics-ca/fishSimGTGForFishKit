@@ -1,0 +1,20 @@
+Package: fishSimGTGForFishKit
+Title: Numerical simulations of fish population dynamics for FishKit
+Version: 1.0.9
+Authors@R: 
+    person(given = "William",
+           family = "Harford",
+           role = c("aut", "cre"),
+           email = "bill@natureanalytics.ca",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Conducts projections, MSE, and equilibrium conditions for a specified fish life history.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports: LBSPR, shinyWidgets, methods, stats, graphics, tidyverse, ggplot2, dplyr, gridExtra, parallel, snowfall, tidyr, here 
+Depends: 
+    R (>= 4.3.0)
+URL: https://github.com/natureanalytics-ca/fishSimGTG_for_FishKit
+BugReports: https://github.com/natureanalytics-ca/fishSimGTG_for_FishKit/issues

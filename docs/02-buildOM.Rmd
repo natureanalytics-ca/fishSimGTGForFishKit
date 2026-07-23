@@ -72,7 +72,7 @@ To create a new object of class `LifeHistory`, use the `new()` function, as foll
 ```{r setup, include=FALSE}
 # Load necessary package
 library(devtools)
-#library(fishSimGTG_for_FishKit)
+#library(fishSimGTGForFishKit)
 library(here)
 ```
 

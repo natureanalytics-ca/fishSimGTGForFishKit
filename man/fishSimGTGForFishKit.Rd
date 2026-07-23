@@ -11,8 +11,8 @@ Conducts projections, MSE, and equilibrium conditions for a specified fish life 
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/natureanalytics-ca/fishSimGTG_for_FishKit}
-  \item Report bugs at \url{https://github.com/natureanalytics-ca/fishSimGTG_for_FishKit/issues}
+  \item \url{https://github.com/natureanalytics-ca/fishSimGTGForFishKit}
+  \item Report bugs at \url{https://github.com/natureanalytics-ca/fishSimGTGForFishKit/issues}
 }
 
 }

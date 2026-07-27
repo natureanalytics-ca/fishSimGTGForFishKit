@@ -17,8 +17,7 @@ runProjection(
   doPlot = FALSE,
   customToCluster = NULL,
   titleStrategy = "No name",
-  waitName = NULL,
-  hostName = NULL
+  asyncProgress = NULL
 )
 }
 \arguments{
@@ -46,9 +45,7 @@ runProjection(
 
 \item{titleStrategy}{A title for management strategy being evaluated.}
 
-\item{waitName}{When used within a shiny app, this function can update a host from the waiter package. See example.}
-
-\item{hostName}{When used within a shiny app, this function can update a host from the waiter package. See example.}
+\item{asyncProgress}{When used within a shiny app}
 }
 \description{
 Function for running projections or MSE
